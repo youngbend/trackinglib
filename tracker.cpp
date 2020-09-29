@@ -273,6 +273,7 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     for (auto t : targets) {
         if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius)) return false;
     }
+    target_lock.unlock();
 
     if ((vbar_bounds[1] - vbar_bounds[0]) > (bottom - top) / 2) return false;
     
