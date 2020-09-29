@@ -43,6 +43,7 @@ void Tracker::scan(unsigned char* image, int rows, int cols, int n_threads) {
 
     for (auto iter = targets.begin(); iter != targets.end();) {
         if ((*iter)->loss_count) {
+	    delete (*iter);
             iter = targets.erase(iter);
         }
         else iter++;
@@ -71,7 +72,10 @@ void Tracker::update_targets(unsigned char* image, int rows, int cols) {
     }
 
     for (auto iter = targets.begin(); iter != targets.end();) {
-        if ((*iter)->dead) iter = targets.erase(iter);
+        if ((*iter)->dead) {
+	    delete (*iter);
+	    iter = targets.erase(iter);
+	}
         else iter++;
     }
 }
