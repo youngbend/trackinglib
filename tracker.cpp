@@ -268,7 +268,7 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     int column_radius = (vbar_bounds[1] - vbar_bounds[0]) / 2;
 
     for (auto t : targets) {
-        if (curr_target && t == curr_target) break;
+        if (curr_target && t == curr_target) continue;
         else if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius)) return false;
     }
 
@@ -366,7 +366,7 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     center_column = (right + left) / 2.0;
 
     for (auto t : targets) {
-        if (curr_target && t == curr_target) break;
+        if (curr_target && t == curr_target) continue;
         else if ((t->center.col - t->radius) <= center.col && center.col <= (t->center.col + t->radius)) return false;
     }
 
