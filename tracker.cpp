@@ -105,7 +105,7 @@ void Tracker::scan_thread(unsigned char* image, int rows, int cols, int lbound, 
                 point center;
                 int radius;
                 
-                if (pinpoint_target(image, rows, cols, {r,c}, center, radius)) {
+                if (pinpoint_target(image, rows, cols, {r,c}, center, radius, nullptr)) {
                     target_lock.lock();
                     targets.push_back(new Target(center, radius));
                     target_lock.unlock();
@@ -153,7 +153,7 @@ void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Ta
     for (int r = top; r < bottom; r += row_scan_offset) {
         for (int c = left; c < right; c += col_scan_offset) {
             if (gradient(image[r*cols+c-col_scan_offset], image[r*cols+c]) > threshold) {
-                if (pinpoint_target(image, rows, cols, {r,c}, center, radius)) {
+                if (pinpoint_target(image, rows, cols, {r,c}, center, radius, target)) {
                     target->update(center, radius);
                     return;
                 }
@@ -167,7 +167,7 @@ void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Ta
     }
 }
 
-bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point start_loc, point &center, int &radius) {
+bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point start_loc, point &center, int &radius, Target *curr_target) {
     int new_scan_offset_row = ceil(row_scan_offset / 2.0);
     int new_scan_offset_col = ceil(col_scan_offset / 2.0);
 
@@ -271,7 +271,8 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
 
     target_lock.lock();
     for (auto t : targets) {
-        if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius)) return false;
+        if (curr_target && t == curr_target) break;
+        else if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius)) return false;
     }
     target_lock.unlock();
 
@@ -370,7 +371,8 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
 
     target_lock.lock();
     for (auto t : targets) {
-        if ((t->center.col - t->radius) <= center.col && center.col <= (t->center.col + t->radius)) return false;
+        if (curr_target && t == curr_target) break;
+        else if ((t->center.col - t->radius) <= center.col && center.col <= (t->center.col + t->radius)) return false;
     }
     target_lock.unlock();
 

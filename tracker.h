@@ -67,7 +67,7 @@ private:
 
     void scan_thread(unsigned char* image, int rows, int cols, int lbound, int rbound);
     void update_targets_thread(unsigned char* image, int rows, int cols, Target *target);
-    bool pinpoint_target(unsigned char* image, int rows, int cols, point start_loc, point &center, int &radius);
+    bool pinpoint_target(unsigned char* image, int rows, int cols, point start_loc, point &center, int &radius, Target *curr_target);
 };
 
 #endif
