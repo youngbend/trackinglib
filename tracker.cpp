@@ -32,7 +32,7 @@ Tracker::Tracker(int scan_offset_row, int scan_offset_col, int target_offset_in,
 vector<point> Tracker::get_target_centers() {
     vector<point> centers;
     for (auto target:targets) {
-        centers.push_back(target.get_center());
+        centers.push_back(target->get_center());
     }
     return centers;
 }
@@ -42,7 +42,7 @@ void Tracker::scan(unsigned char* image, int rows, int cols, int n_threads) {
     update_targets(image, rows, cols);
 
     for (auto iter = targets.begin(); iter != targets.end();) {
-        if (iter->loss_count) {
+        if ((*iter)->loss_count) {
             iter = targets.erase(iter);
         }
         else iter++;
@@ -71,7 +71,7 @@ void Tracker::update_targets(unsigned char* image, int rows, int cols) {
     }
 
     for (auto iter = targets.begin(); iter != targets.end();) {
-        if (iter->dead) iter = targets.erase(iter);
+        if ((*iter)->dead) iter = targets.erase(iter);
         else iter++;
     }
 }
@@ -84,8 +84,8 @@ void Tracker::scan_thread(unsigned char* image, int rows, int cols, int lbound, 
                 // image[r*cols + c - col_scan_offset] = 255;
                 bool inside_target = false;
                 for (auto t : targets) {
-                    if ((t.center.row - t.radius) <= r && r <= (t.center.row + t.radius) && 
-                        (t.center.col - t.radius) <= c && c <= (t.center.col + t.radius)) {
+                    if ((t->center.row - t->radius) <= r && r <= (t->center.row + t->radius) && 
+                        (t->center.col - t->radius) <= c && c <= (t->center.col + t->radius)) {
                             inside_target = true;
                             break;
                         }
@@ -101,7 +101,7 @@ void Tracker::scan_thread(unsigned char* image, int rows, int cols, int lbound, 
                 
                 if (pinpoint_target(image, rows, cols, {r,c}, center, radius)) {
                     target_lock.lock();
-                    targets.push_back(Target(center, radius));
+                    targets.push_back(new Target(center, radius));
                     target_lock.unlock();
                     // DEBUG
                     // image[center.row * cols + center.col - col_scan_offset] = 255;
@@ -111,33 +111,33 @@ void Tracker::scan_thread(unsigned char* image, int rows, int cols, int lbound, 
     }
 }
 
-void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Target &target) {
+void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Target *target) {
     double row_offset = 0;
     double col_offset = 0;
     double depth_offset = 0;
     double track_offset = tracking_offset;
-    if (target.prev_center.row != -1 && target.prev_center.col != -1) {
-        row_offset = target.center.row - target.prev_center.row;
-        col_offset = target.center.col - target.prev_center.col;
-        depth_offset = target.radius - target.prev_radius;
+    if (target->prev_center.row != -1 && target->prev_center.col != -1) {
+        row_offset = target->center.row - target->prev_center.row;
+        col_offset = target->center.col - target->prev_center.col;
+        depth_offset = target->radius - target->prev_radius;
         if (depth_offset < 0) depth_offset = 0;
-        if (target.loss_count) {
-            double interpolation_factor = 3.0 - 3.25 * exp(-target.loss_count / 2.0);
+        if (target->loss_count) {
+            double interpolation_factor = 3.0 - 3.25 * exp(-target->loss_count / 2.0);
             row_offset *= interpolation_factor;
             col_offset *= interpolation_factor;
             depth_offset *= interpolation_factor;
             track_offset *= interpolation_factor;
         }
     }
-    else if (target.loss_count) tracking_offset *= 1.5;
+    else if (target->loss_count) tracking_offset *= 1.5;
 
-    int top = int(target.center.row - target.radius + row_offset - depth_offset - track_offset);
-    int bottom = int(target.center.row + target.radius + row_offset + depth_offset + track_offset);
-    int left = int(target.center.col - target.radius + col_offset - depth_offset - track_offset);
-    int right = int(target.center.col + target.radius + col_offset + depth_offset + track_offset);
+    int top = int(target->center.row - target->radius + row_offset - depth_offset - track_offset);
+    int bottom = int(target->center.row + target->radius + row_offset + depth_offset + track_offset);
+    int left = int(target->center.col - target->radius + col_offset - depth_offset - track_offset);
+    int right = int(target->center.col + target->radius + col_offset + depth_offset + track_offset);
 
     if (top < 0 || left < 0 || bottom > rows || right > cols) {
-        target.kill();
+        target->kill();
         return;
     }
 
@@ -148,18 +148,17 @@ void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Ta
         for (int c = left; c < right; c += col_scan_offset) {
             if (gradient(image[r*cols+c-col_scan_offset], image[r*cols+c]) > threshold) {
                 if (pinpoint_target(image, rows, cols, {r,c}, center, radius)) {
-		    cout << "Center redetected at " << center.row << " " << center.col << endl;
-                    target.update(center, radius);
+                    target->update(center, radius);
                     return;
                 }
             }
         }
     }
 
-    target.lost();
-    cout << "Target loss count = " << target.loss_count << endl;
-    if (target.loss_count >= tracking_timeout) {
-        target.kill();
+    target->lost();
+    cout << "Target loss count = " << target->loss_count << endl;
+    if (target->loss_count >= tracking_timeout) {
+        target->kill();
     }
 }
 

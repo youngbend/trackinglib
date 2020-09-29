@@ -63,10 +63,10 @@ private:
 
     std::mutex target_lock;
 
-    std::list<Target> targets;
+    std::list<Target*> targets;
 
     void scan_thread(unsigned char* image, int rows, int cols, int lbound, int rbound);
-    void update_targets_thread(unsigned char* image, int rows, int cols, Target &target);
+    void update_targets_thread(unsigned char* image, int rows, int cols, Target *target);
     bool pinpoint_target(unsigned char* image, int rows, int cols, point start_loc, point &center, int &radius);
 };
 
