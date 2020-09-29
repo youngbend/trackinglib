@@ -199,7 +199,7 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     vector<int> left_right = {initial_left, initial_right};
     int gradient_counter = 0;
 
-    for (int r = start_loc.row - new_scan_offset_row; r < rows; r += new_scan_offset_row) {
+    for (int r = start_loc.row; r < rows; r += new_scan_offset_row) {
         if (r < 0) return false;
 
         bool edge_trigger = false;
@@ -261,16 +261,11 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     
     if (top == -1 || bottom == -1 || vbar_bounds.size() != 4) return false;
 
-    if (abs((vbar_bounds[1] - vbar_bounds[0]) - (vbar_bounds[3] - vbar_bounds[2])) > 2*target_offset) return false;
+    if (abs((vbar_bounds[1] - vbar_bounds[0]) - (vbar_bounds[3] - vbar_bounds[2])) > 3*target_offset) return false;
 
     double center_row = (top + bottom) / 2.0;
     double center_column = accumulate(vbar_bounds.begin(), vbar_bounds.end(), 0) / 4.0 + new_scan_offset_col;
     int column_radius = (vbar_bounds[1] - vbar_bounds[0]) / 2;
-
-    for (auto t : targets) {
-        if (curr_target && t == curr_target) continue;
-        else if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius)) return false;
-    }
 
     if ((vbar_bounds[1] - vbar_bounds[0]) > (bottom - top) / 2) return false;
     
@@ -359,7 +354,7 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
 
     if (left == -1 || right == -1 || hbar_bounds.size() != 4) return false;
 
-    if (abs((hbar_bounds[1] - hbar_bounds[0]) - (hbar_bounds[3] - hbar_bounds[2])) > 2*target_offset) return false;
+    if (abs((hbar_bounds[1] - hbar_bounds[0]) - (hbar_bounds[3] - hbar_bounds[2])) > 3*target_offset) return false;
 
     if (hbar_bounds[1] - hbar_bounds[0] > (right - left) / 2) return false;
 
@@ -367,7 +362,8 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
 
     for (auto t : targets) {
         if (curr_target && t == curr_target) continue;
-        else if ((t->center.col - t->radius) <= center.col && center.col <= (t->center.col + t->radius)) return false;
+        else if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius) && 
+                 (t->center.col - t->radius) <= center_column && center_column <= (t->center.col + t->radius)) return false;
     }
 
     vector<double> up_vec = {(vbar_bounds[1] + vbar_bounds[0]) / 2.0 - center_column, double(center_row - top)};
