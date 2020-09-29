@@ -88,13 +88,11 @@ void Tracker::scan_thread(unsigned char* image, int rows, int cols, int lbound, 
                 // image[r*cols + c - col_scan_offset] = 255;
                 bool inside_target = false;
                 for (auto t : targets) {
-                    target_lock.lock();
                     if ((t->center.row - t->radius) <= r && r <= (t->center.row + t->radius) && 
                         (t->center.col - t->radius) <= c && c <= (t->center.col + t->radius)) {
                             inside_target = true;
                             break;
                         }
-                    target_lock.unlock();
                 }
                 
                 if (inside_target) {
@@ -269,12 +267,10 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     double center_column = accumulate(vbar_bounds.begin(), vbar_bounds.end(), 0) / 4.0 + new_scan_offset_col;
     int column_radius = (vbar_bounds[1] - vbar_bounds[0]) / 2;
 
-    target_lock.lock();
     for (auto t : targets) {
         if (curr_target && t == curr_target) break;
         else if ((t->center.row - t->radius) <= center_row && center_row <= (t->center.row + t->radius)) return false;
     }
-    target_lock.unlock();
 
     if ((vbar_bounds[1] - vbar_bounds[0]) > (bottom - top) / 2) return false;
     
@@ -369,12 +365,10 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
 
     center_column = (right + left) / 2.0;
 
-    target_lock.lock();
     for (auto t : targets) {
         if (curr_target && t == curr_target) break;
         else if ((t->center.col - t->radius) <= center.col && center.col <= (t->center.col + t->radius)) return false;
     }
-    target_lock.unlock();
 
     vector<double> up_vec = {(vbar_bounds[1] + vbar_bounds[0]) / 2.0 - center_column, double(center_row - top)};
     if (all_of(up_vec.begin(), up_vec.end(), [](double i) { return i == 0; })) return false;
