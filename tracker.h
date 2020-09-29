@@ -26,7 +26,7 @@ public:
         radius = radius_in;
     }
 
-    void lost() { loss_count++; }
+    void lost() { loss_count += 1; }
 
     void kill() { dead = true; }
 

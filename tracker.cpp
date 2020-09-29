@@ -4,6 +4,7 @@
 #include <thread>
 #include <math.h>
 #include <numeric>
+#include <functional>
 
 using namespace std;
 
@@ -147,6 +148,7 @@ void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Ta
         for (int c = left; c < right; c += col_scan_offset) {
             if (gradient(image[r*cols+c-col_scan_offset], image[r*cols+c]) > threshold) {
                 if (pinpoint_target(image, rows, cols, {r,c}, center, radius)) {
+		    cout << "Center redetected at " << center.row << " " << center.col << endl;
                     target.update(center, radius);
                     return;
                 }
@@ -155,6 +157,7 @@ void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Ta
     }
 
     target.lost();
+    cout << "Target loss count = " << target.loss_count << endl;
     if (target.loss_count >= tracking_timeout) {
         target.kill();
     }
