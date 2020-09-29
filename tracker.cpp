@@ -392,18 +392,18 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     // image[(hbar_bounds[1]+hbar_bounds[0])/2*cols + left] = 255;
     // image[(hbar_bounds[3]+hbar_bounds[2])/2*cols + right] = 255;
 
-    // cout << "Center at: (" << center_row << "," << center_column << ")" << endl;
+    cout << "Center at: (" << center_row << "," << center_column << ")" << endl;
 
-    // cout << "Orthogonals: " << dot(up_unit, right_unit) << "," << dot(up_unit, left_unit) << "," << dot(left_unit, down_unit) << "," << dot(right_unit, down_unit) << endl;
-    // cout << "Parallels: " << dot(up_unit, down_unit) << "," << dot(right_unit, left_unit) << endl;
+    cout << "Orthogonals: " << dot(up_unit, right_unit) << "," << dot(up_unit, left_unit) << "," << dot(left_unit, down_unit) << "," << dot(right_unit, down_unit) << endl;
+    cout << "Parallels: " << dot(up_unit, down_unit) << "," << dot(right_unit, left_unit) << endl;
     // END DEBUG
 
-    if (abs(dot(up_unit, right_unit)) > 0.35) return false;
-    if (abs(dot(up_unit, left_unit)) > 0.35) return false;
-    if (abs(dot(left_unit, down_unit)) > 0.35) return false;
-    if (abs(dot(right_unit, down_unit)) > 0.35) return false;
-    if (abs(abs(dot(up_unit, down_unit)) - 1) > 0.15) return false;
-    if (abs(abs(dot(right_unit, left_unit)) - 1) > 0.15) return false;
+    if (abs(dot(up_unit, right_unit)) > 0.25) return false;
+    if (abs(dot(up_unit, left_unit)) > 0.25) return false;
+    if (abs(dot(left_unit, down_unit)) > 0.25) return false;
+    if (abs(dot(right_unit, down_unit)) > 0.25) return false;
+    if (abs(abs(dot(up_unit, down_unit)) - 1) > 0.05) return false;
+    if (abs(abs(dot(right_unit, left_unit)) - 1) > 0.05) return false;
 
     center = {int(ceil(center_row)), int(ceil(center_column))};
     radius = max(bottom - top, right - left) / 2;

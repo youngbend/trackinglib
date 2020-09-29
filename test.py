@@ -3,13 +3,13 @@ import Tracker
 import numpy as np
 import time
 
-im = cv2.imread("/home/ybenjamin/Documents/eecs467/a1/multi_target.jpg")
+im = cv2.imread("/home/ybenjamin/Documents/eecs467/a1/edge_case2.jpg")
 im = cv2.resize(im, (640,480))
 tracker = Tracker.Tracker(2,2,5,25,15,15)
 
 begin = time.time()
 gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-tracker.scan(gray, 3)
+tracker.scan(gray, 1)
 print("Time to run = {} seconds".format(time.time() - begin))
 
 centers = tracker.get_target_centers()
