@@ -1,3 +1,6 @@
+// Author: Benjamin Young (youngben@umich.edu)
+// Made for EECS 467
+
 #include "tracker.h"
 #include <iostream>
 #include <algorithm>
@@ -25,6 +28,35 @@ vector<double> unitVec(const vector<double> &vec) {
     return ret;
 }
 
+void rotation(double &x, double &y, double theta) {
+    double u = cos(theta) * x - sin(theta) * y;
+    double v = sin(theta) * x + cos(theta) * y;
+    x = u;
+    y = v;
+}
+
+bool corr_coef_check(std::vector<double>& line_x, std::vector<double>& line_y){
+    int n = line_x.size();
+    if(n == 0) return false;
+
+    for (size_t i = 0; i < line_x.size(); i++) {
+        // Rotate points by 45 degrees to account for vertical or horizontal lines
+        rotation(line_x[i], line_y[i], 0.785398);
+    }
+
+    double sum_x = accumulate(line_x.begin(), line_x.end(), 0.0);
+    double sum_y = accumulate(line_y.begin(), line_y.end(), 0.0);
+    double sq_sum_x = dot(line_x, line_x);
+    double sq_sum_y = dot(line_y, line_y);
+    double sum_xy = dot(line_x, line_y);
+
+    double corr_coef = (n * sum_xy - sum_x * sum_y) / sqrt((n * sq_sum_x - sum_x * sum_x) * (n * sq_sum_y - sum_y * sum_y));
+
+    if(abs(corr_coef) < 0.9) return false;
+
+    return true;
+}
+
 Tracker::Tracker(int scan_offset_row, int scan_offset_col, int target_offset_in, int threshold_in, int tracking_offset_in, int tracking_timeout_in) :
     row_scan_offset(scan_offset_row), col_scan_offset(scan_offset_col), target_offset(target_offset_in), threshold(threshold_in),
     tracking_offset(tracking_offset_in), tracking_timeout(tracking_timeout_in) { }
@@ -43,7 +75,7 @@ void Tracker::scan(unsigned char* image, int rows, int cols, int n_threads) {
 
     for (auto iter = targets.begin(); iter != targets.end();) {
         if ((*iter)->loss_count) {
-	    delete (*iter);
+        delete (*iter);
             iter = targets.erase(iter);
         }
         else iter++;
@@ -73,9 +105,9 @@ void Tracker::update_targets(unsigned char* image, int rows, int cols) {
 
     for (auto iter = targets.begin(); iter != targets.end();) {
         if ((*iter)->dead) {
-	    delete (*iter);
-	    iter = targets.erase(iter);
-	}
+        delete (*iter);
+        iter = targets.erase(iter);
+    }
         else iter++;
     }
 }
@@ -126,14 +158,18 @@ void Tracker::update_targets_thread(unsigned char* image, int rows, int cols, Ta
         depth_offset = target->radius - target->prev_radius;
         if (depth_offset < 0) depth_offset = 0;
         if (target->loss_count) {
-            double interpolation_factor = 3.0 - 3.25 * exp(-target->loss_count / 2.0);
+            double interpolation_factor = 1.9 - exp(-target->loss_count / 8.0);
             row_offset *= interpolation_factor;
             col_offset *= interpolation_factor;
             depth_offset *= interpolation_factor;
-            track_offset *= interpolation_factor;
+	    track_offset *= interpolation_factor;
         }
     }
-    else if (target->loss_count) tracking_offset *= 1.5;
+
+    else if (target->loss_count) {
+    	double interpolation_factor = 1.9 - exp(-target->loss_count / 8.0);
+	track_offset *= interpolation_factor;
+    }
 
     int top = int(target->center.row - target->radius + row_offset - depth_offset - track_offset);
     int bottom = int(target->center.row + target->radius + row_offset + depth_offset + track_offset);
@@ -169,7 +205,6 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     int new_scan_offset_row = ceil(row_scan_offset / 2.0);
     int new_scan_offset_col = ceil(col_scan_offset / 2.0);
 
-
     int initial_left = -1;
     for (int c = start_loc.col; c > 0; c -= new_scan_offset_col) {
         if (gradient(image[start_loc.row * cols + c - new_scan_offset_col], image[start_loc.row * cols + c]) > threshold) {
@@ -199,6 +234,10 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     vector<int> left_right = {initial_left, initial_right};
     int gradient_counter = 0;
 
+    vector<double> vbar_x;
+    vector<double> vbar_y;
+
+
     for (int r = start_loc.row; r < rows; r += new_scan_offset_row) {
         if (r < 0) return false;
 
@@ -206,9 +245,11 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
         bool cross_encounter = false;
         int min_row_intensity = 255;
 
+
         for (int c = left_right[0] - target_offset; c < left_right[1] + target_offset; c += new_scan_offset_col) {
             if (c < new_scan_offset_col || c >= cols) return false;
 
+            /* White to black */
             if (gradient(image[r * cols + c - new_scan_offset_col], image[r * cols + c]) > threshold) {
                 // image[r*cols + c - new_scan_offset_col] = 255;
                 cross_encounter = true;
@@ -223,19 +264,24 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
                 }
             }
 
+            /* Black to white */
             else if (gradient(image[r * cols + c - new_scan_offset_col], image[r * cols + c]) < -threshold) {
                 // image[r*cols + c - new_scan_offset_col] = 0;
                 cross_encounter = true;
                 if (edge_trigger) {
                     left_right[1] = c;
+                    
+                    vbar_x.push_back((left_right[1] + left_right[0])/2.0);
+                    vbar_y.push_back(r);
 
-                    if (top && vbar_bounds.size() == 1) {
+                    if (top != -1 && vbar_bounds.size() == 1) {
                         vbar_bounds.push_back(c);
                     }
-
-                    continue;
+                    
+                    break;
                 }
             }
+
 
             if (top != -1 && image[r*cols+c] < min_row_intensity) {
                 min_row_intensity = image[r*cols+c];
@@ -256,12 +302,16 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
 
         else gradient_counter++;
 
+
         if (gradient_counter > 1.5 * (initial_right - initial_left)) return false;
     }
+
     
     if (top == -1 || bottom == -1 || vbar_bounds.size() != 4) return false;
 
     if (abs((vbar_bounds[1] - vbar_bounds[0]) - (vbar_bounds[3] - vbar_bounds[2])) > 3*target_offset) return false;
+
+    if(!corr_coef_check(vbar_x, vbar_y)) return false;
 
     double center_row = (top + bottom) / 2.0;
     double center_column = accumulate(vbar_bounds.begin(), vbar_bounds.end(), 0) / 4.0 + new_scan_offset_col;
@@ -273,7 +323,10 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     int right = -1;
 
     vector<int> hbar_bounds;
-    
+    vector<double> hbar_x;
+    vector<double> hbar_y;
+
+
     vector<int> up_down = {int(center_row) - column_radius, int(center_row) + column_radius};
     for (int c = int(center_column) - column_radius; c >= new_scan_offset_col; c -= new_scan_offset_col) {
         bool edge_trigger = false;
@@ -292,11 +345,17 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
                 }
             }
 
+
             else if (gradient(image[(r-new_scan_offset_row)*cols + c], image[r*cols+c]) < -threshold) {
                 cross_encounter = true;
                 if (edge_trigger) {
+                   
                     up_down[1] = r;
-                    continue;
+
+                    hbar_x.push_back(c);
+                    hbar_y.push_back((up_down[1] + up_down[0])/2.0);
+
+                    break;
                 }
             }
 
@@ -304,7 +363,6 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
                 min_col_intensity = image[r*cols+c];
             }
         }
-
         if (!cross_encounter && abs(min_col_intensity - min_intensity) > threshold) {
             left = c + new_scan_offset_col;
             hbar_bounds.push_back(up_down[0]);
@@ -335,7 +393,11 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
                 cross_encounter = true;
                 if (edge_trigger) {
                     up_down[1] = r;
-                    continue;
+
+                    hbar_x.push_back(c);
+                    hbar_y.push_back((up_down[1] + up_down[0]) / 2.0);
+
+                    break;
                 }
             }
 
@@ -344,12 +406,16 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
             }
         }
 
+
         if (!cross_encounter && abs(min_col_intensity - min_intensity) > threshold) {
             right = c - new_scan_offset_col;
+
             hbar_bounds.push_back(up_down[0]);
             hbar_bounds.push_back(up_down[1]);
+
             break;
         }
+
     }
 
     if (left == -1 || right == -1 || hbar_bounds.size() != 4) return false;
@@ -357,6 +423,8 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     if (abs((hbar_bounds[1] - hbar_bounds[0]) - (hbar_bounds[3] - hbar_bounds[2])) > 3*target_offset) return false;
 
     if (hbar_bounds[1] - hbar_bounds[0] > (right - left) / 2) return false;
+
+    if(!corr_coef_check(hbar_x, hbar_y)) return false;
 
     center_column = (right + left) / 2.0;
 
@@ -391,24 +459,22 @@ bool Tracker::pinpoint_target(unsigned char* image, int rows, int cols, point st
     // image[bottom*cols + (vbar_bounds[3] + vbar_bounds[2])/2] = 255;
     // image[(hbar_bounds[1]+hbar_bounds[0])/2*cols + left] = 255;
     // image[(hbar_bounds[3]+hbar_bounds[2])/2*cols + right] = 255;
-
-    cout << "Center at: (" << center_row << "," << center_column << ")" << endl;
-
-    cout << "Orthogonals: " << dot(up_unit, right_unit) << "," << dot(up_unit, left_unit) << "," << dot(left_unit, down_unit) << "," << dot(right_unit, down_unit) << endl;
-    cout << "Parallels: " << dot(up_unit, down_unit) << "," << dot(right_unit, left_unit) << endl;
+    // cout << "Center at: (" << center_row << "," << center_column << ")" << endl;
+    // cout << "Orthogonals: " << dot(up_unit, right_unit) << "," << dot(up_unit, left_unit) << "," << dot(left_unit, down_unit) << "," << dot(right_unit, down_unit) << endl;
+    // cout << "Parallels: " << dot(up_unit, down_unit) << "," << dot(right_unit, left_unit) << endl;
     // END DEBUG
 
-    if (abs(dot(up_unit, right_unit)) > 0.25) return false;
-    if (abs(dot(up_unit, left_unit)) > 0.25) return false;
-    if (abs(dot(left_unit, down_unit)) > 0.25) return false;
-    if (abs(dot(right_unit, down_unit)) > 0.25) return false;
-    if (abs(abs(dot(up_unit, down_unit)) - 1) > 0.05) return false;
-    if (abs(abs(dot(right_unit, left_unit)) - 1) > 0.05) return false;
+    if (abs(dot(up_unit, right_unit)) > 0.35) return false;
+    if (abs(dot(up_unit, left_unit)) > 0.35) return false;
+    if (abs(dot(left_unit, down_unit)) > 0.35) return false;
+    if (abs(dot(right_unit, down_unit)) > 0.35) return false;
+    if (abs(abs(dot(up_unit, down_unit)) - 1) > 0.15) return false;
+    if (abs(abs(dot(right_unit, left_unit)) - 1) > 0.15) return false;
 
     center = {int(ceil(center_row)), int(ceil(center_column))};
     radius = max(bottom - top, right - left) / 2;
-
+    
     // cout << "Center at: (" << center_row << "," << center_column << ")" << " with radius = " << radius << endl;
-
+    
     return true;
 }

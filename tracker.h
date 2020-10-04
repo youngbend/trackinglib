@@ -1,3 +1,6 @@
+// Author: Benjamin Young (youngben@umich.edu)
+// Made for EECS 467
+
 #ifndef TRACKER_H
 #define TRACKER_H
 
